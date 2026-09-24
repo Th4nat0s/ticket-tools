@@ -6,7 +6,7 @@ import os
 from pyurlabuse import PyURLAbuse
 import rt
 import logging
-import sphinxapi
+#import sphinxapi
 import time
 import csv
 
@@ -38,9 +38,9 @@ tracker = rt.Rt(rt_url, rt_user, rt_pass, verify_cert=False)
 tracker.login()
 
 # Sphinx
-client = sphinxapi.SphinxClient()
-client.SetServer(sphinx_server, sphinx_port)
-client.SetMatchMode(2)
+#client = sphinxapi.SphinxClient()
+#client.SetServer(sphinx_server, sphinx_port)
+#client.SetMatchMode(2)
 
 
 def is_ticket_open(id):
@@ -78,7 +78,7 @@ if 'Format' in headerline:
         reader = csv.reader(f)
         my_list = list(reader)
     for item in my_list:
-#        print(item)
+        print(item)
         if (item and 'Format' not in item[0]) and item[1] not in excludelist:
             abuse_emails.add(item[0])
     for abuse_email in abuse_emails:
@@ -97,6 +97,7 @@ if 'Format' in headerline:
         text = detail_text
         d = {'details': text}
 
+        sys.exit(1)
         try:
             f = open(template)
             subject = f.readline().rstrip()

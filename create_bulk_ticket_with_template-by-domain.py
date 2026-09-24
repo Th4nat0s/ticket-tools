@@ -81,11 +81,11 @@ def load_csv_rows(path: str):
 
 
 def extract_emails(text: str) -> List[str]:
-        return list({normalize_email(e) for e in EMAIL_REGEX.findall(text or "")})
+    return list({normalize_email(e) for e in EMAIL_REGEX.findall(text or "")})
 
 
 def normalize_email(email: str) -> str:
-        return email.strip().lower().rstrip(".,;:<>")
+    return email.strip().lower().rstrip(".,;:<>")
 
 
 def extract_emails_from_rows(rows):
