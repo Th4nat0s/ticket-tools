@@ -4,6 +4,7 @@ from pathlib import Path
 import runpy
 import sys
 import unittest
+from urllib.parse import urlsplit
 from unittest.mock import Mock, patch
 
 from url_normalization import normalize_url_hostname
@@ -79,6 +80,11 @@ class TicketFlowTests(unittest.TestCase):
         misp.add_object.return_value = result
         misp.add_object.side_effect = failure
         obj = Mock()
+        # FAUP's native library is not required for these mocked flow tests.
+        self.faup = Mock()
+        self.faup.get_host.side_effect = lambda: urlsplit(
+            self.faup.decode.call_args.args[0]
+        ).hostname.upper()
         modules = {
             "config": Mock(
                 ua="test",
@@ -96,6 +102,8 @@ class TicketFlowTests(unittest.TestCase):
                 PyMISP=Mock(return_value=misp), MISPObject=Mock(return_value=obj)
             ),
             "ioc_fanger": Mock(defang=lambda value: value),
+            "pyfaup": Mock(),
+            "pyfaup.faup": Mock(Faup=Mock(return_value=self.faup)),
         }
         argv = [
             str(ROOT / "create_ticket_with_template.py"),
@@ -128,6 +136,10 @@ class TicketFlowTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertIn("Information added to MISP.", out)
         self.assertEqual(err, "")
+        self.assertEqual(
+            [call.args[0] for call in self.faup.decode.call_args_list],
+            [UNICODE_URL, ASCII_URL, ASCII_URL, "https://xn--fa-hia.de/été?q=è"],
+        )
         for call in abuse.run_query.call_args_list:
             self.assertEqual(call.args[0], ASCII_URL)
         misp.search.assert_called_once_with(

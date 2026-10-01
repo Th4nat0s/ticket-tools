@@ -4,7 +4,6 @@ from string import Template
 import ioc_fanger
 import time
 import os
-from urllib.parse import urlsplit
 
 from url_normalization import normalize_url_hostname
 
@@ -23,6 +22,7 @@ import logging
 # import sphinxapi
 import urllib3
 import json
+from pyfaup.faup import Faup
 import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -235,9 +235,12 @@ if misp_id is not False:
         misp.sighting(uuid=uuid, source="URLabuse")
         sys.exit(0)
     redirect_count = 0
-    hostname = urlsplit(url).hostname
+    fex = Faup()
     # Screenshot collection uses the original URL's hostname as its filename.
-    screenshot = urlsplit(original_url).hostname + ".png"
+    fex.decode(original_url)
+    screenshot = fex.get_host().lower() + ".png"
+    fex.decode(url)
+    hostname = fex.get_host().lower()
     mispObject = MISPObject("phishing")
     mispObject.add_attribute("hostname", value=hostname)
     for u in misp_urls:
@@ -250,7 +253,8 @@ if misp_id is not False:
                 "url-redirect", value=u, comment=comment.format(redirect_count)
             )
         redirect_count += 1
-        nexthost = urlsplit(u).hostname
+        fex.decode(u)
+        nexthost = fex.get_host().lower()
         if nexthost != hostname:
             hostname = nexthost
             mispObject.add_attribute("hostname", to_ids=False, value=hostname)
