@@ -4,6 +4,9 @@ from string import Template
 import ioc_fanger
 import time
 import os
+from urllib.parse import urlsplit
+
+from url_normalization import normalize_url_hostname
 
 from pyurlabuse import PyURLAbuse
 from pymisp import PyMISP, MISPEvent, MISPObject
@@ -19,7 +22,6 @@ import logging
 #import sphinxapi
 import urllib3
 import json
-from pyfaup.faup import Faup
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -33,7 +35,12 @@ incident = sys.argv[1]
 template = sys.argv[2]
 templatename = template
 
-url = sys.argv[3]
+original_url = sys.argv[3]
+try:
+    url = normalize_url_hostname(original_url)
+except ValueError:
+    print("Invalid URL or IDNA hostname; no ticket created.", file=sys.stderr)
+    sys.exit(1)
 try:
     onlinecheck = sys.argv[4]
 except Exception:
@@ -138,6 +145,14 @@ response = my_pyurlabuse.run_query(url, with_digest=True)
 emails = ",".join([email.strip('.') for email in response['digest'][1]])
 asns = response['digest'][2]
 
+if misp_id is not False:
+    try:
+        misp_urls = [normalize_url_hostname(next(iter(item)))
+                     for item in response['result']]
+    except ValueError:
+        print("Invalid URL or IDNA hostname from URLAbuse; no ticket created.", file=sys.stderr)
+        sys.exit(1)
+
 text = ioc_fanger.defang(response['digest'][0])
 d = {'details': text}
 
@@ -205,14 +220,12 @@ if misp_id is not False:
         misp.sighting(uuid=uuid, source="URLabuse")
         sys.exit(0)
     redirect_count = 0
-    fex = Faup()
-    fex.decode(url)
-    hostname = fex.get_host().lower()
-    screenshot = hostname + '.png'
+    hostname = urlsplit(url).hostname
+    # Screenshot collection uses the original URL's hostname as its filename.
+    screenshot = urlsplit(original_url).hostname + '.png'
     mispObject = MISPObject('phishing')
     mispObject.add_attribute('hostname', value=hostname)
-    for key in response['result']:
-        u = list(key.keys())[0]
+    for u in misp_urls:
         if redirect_count == 0:
             comment = "initial URL"
             mispObject.add_attribute('url', value=u, comment=comment)
@@ -220,8 +233,7 @@ if misp_id is not False:
             comment = "redirect URL: {}"
             mispObject.add_attribute('url-redirect', value=u, comment=comment.format(redirect_count))
         redirect_count += 1
-        fex.decode(u)
-        nexthost = fex.get_host().lower()
+        nexthost = urlsplit(u).hostname
         if nexthost != hostname:
             hostname = nexthost
             mispObject.add_attribute('hostname', to_ids=False, value=hostname)
@@ -239,5 +251,15 @@ if misp_id is not False:
     mispObject.add_attribute('online', value="Yes")
     mispObject.add_attribute('verified', value="Yes")
     #print(mispObject.to_json(indent=2))
-    misp.add_object(misp_id, mispObject)
+    try:
+        result = misp.add_object(misp_id, mispObject)
+    except Exception:
+        print("MISP object save failed; RT ticket already created. Do not rerun ticket creation.", file=sys.stderr)
+        sys.exit(1)
+    if (not isinstance(result, dict) or 'errors' in result
+            or result.get('saved') is False
+            or not isinstance(result.get('Object'), dict)
+            or not result['Object'].get('id')):
+        print("MISP object save not confirmed; RT ticket already created. Do not rerun ticket creation.", file=sys.stderr)
+        sys.exit(1)
     print("Information added to MISP.")
