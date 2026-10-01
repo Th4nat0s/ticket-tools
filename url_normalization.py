@@ -13,14 +13,14 @@ def normalize_url_hostname(url):
     if not parts.netloc or not parts.hostname:
         raise ValueError("URL must include an authority and hostname")
 
-    userinfo, separator, hostport = parts.netloc.rpartition('@')
+    userinfo, separator, hostport = parts.netloc.rpartition("@")
     # urlsplit validates bracketed IP literals; IDNA only applies to DNS names.
-    if hostport.startswith('['):
+    if hostport.startswith("["):
         return url
-    hostname, colon, port = hostport.partition(':')
-    ascii_hostname = idna.encode(hostname, uts46=True).decode('ascii')
+    hostname, colon, port = hostport.partition(":")
+    ascii_hostname = idna.encode(hostname, uts46=True).decode("ascii")
     netloc = userinfo + separator + ascii_hostname + colon + port
 
     # Replace only the authority, retaining even empty '?' / '#' delimiters.
-    start = url.index('//') + 2
-    return url[:start] + netloc + url[start + len(parts.netloc):]
+    start = url.index("//") + 2
+    return url[:start] + netloc + url[start + len(parts.netloc) :]
